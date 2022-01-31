@@ -82,11 +82,11 @@ md"""
 
 # ╔═╡ 7f0cd2ba-d74b-48c1-8ef4-b2e37ecac80b
 begin
-	function get_param1(conf::Dict{String, Union{Float64, Date, Int64, String}})
+	function get_param1(conf::Dict)
 		conf["param1"]::String
 	end
 
-	function get_param2(conf::Dict{String, Union{Float64, Date, Int64, String}})
+	function get_param2(conf::Dict)
 		conf["param2"]::Int
 	end
 	# ...
@@ -199,6 +199,65 @@ date_df = DataFrame(
 
 # ╔═╡ 0f14108e-64f0-4b21-b4f9-9929978af453
 mapcols(x -> days_since_new_year.(x), date_df)
+
+# ╔═╡ e90faa5d-af8b-4a4c-a5af-84eaf000839d
+md"""
+## Preparing Data for Efficient Dispatch
+Dispatch is powerful, but you can give it a further boost by taking away decisions from it.
+	"""
+
+# ╔═╡ 56a3a697-4114-4b90-a94b-e66805a66fdd
+heterogenous_vector::Vector{Any} = [
+	"heterogenous",
+	"data",
+	25,
+	2.3,
+	[1,2,3],
+	"another",
+	2,
+	12345
+]
+
+# ╔═╡ c202e08a-a347-4821-94d4-32636ad3bd06
+begin
+	# Create your variable outside the loop
+	type_dict::Dict{DataType, Vector{Any}} = Dict()
+	
+	for x in heterogenous_vector
+		# Make a vector for each type of data in the original
+		if typeof(x) in keys(type_dict)
+			push!(type_dict[typeof(x)], x)
+		else
+			type_dict[typeof(x)] = [x]
+		end
+	end
+end
+
+# ╔═╡ 2486d867-388d-4b50-ae34-c4a3f4f6e726
+type_dict
+
+# ╔═╡ ee5d4f11-72c7-4cd1-bb53-9945e26ab5fb
+begin
+	function make_a_string(v::String)
+		v
+	end
+	function make_a_string(v::Number)
+		string(v)
+	end
+	function make_a_string(v::Vector{Int64})
+		join(make_a_string.(v), ", ")
+	end
+end
+
+# ╔═╡ aec8a241-2901-4762-bb88-a7408e2e11d8
+begin
+	strings_vec::Vector{String} = []
+	for (dtype, vec) in pairs(type_dict)
+		typed_vec::Vector{dtype} = vec
+		append!(strings_vec, make_a_string.(vec))
+	end
+	strings_vec
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -534,5 +593,11 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═ea069802-e118-4dea-ba8f-b6c3d877a876
 # ╠═ac6bb46b-ea0a-43a9-bba4-57d930764d3a
 # ╠═0f14108e-64f0-4b21-b4f9-9929978af453
+# ╟─e90faa5d-af8b-4a4c-a5af-84eaf000839d
+# ╠═56a3a697-4114-4b90-a94b-e66805a66fdd
+# ╠═c202e08a-a347-4821-94d4-32636ad3bd06
+# ╠═2486d867-388d-4b50-ae34-c4a3f4f6e726
+# ╠═ee5d4f11-72c7-4cd1-bb53-9945e26ab5fb
+# ╠═aec8a241-2901-4762-bb88-a7408e2e11d8
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
