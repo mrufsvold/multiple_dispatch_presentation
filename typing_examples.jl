@@ -6,15 +6,23 @@ using InteractiveUtils
 
 # ╔═╡ ab32e710-735f-11ec-2417-bf20f0dda11f
 begin
-using YAML
-using Dates
-using DataFrames
+	using YAML
+	using Dates
+	using DataFrames
+	using PlutoUI
+	using BenchmarkTools
 end
 
 # ╔═╡ be7771fb-19c2-43b7-8eff-f2f7af7fab36
 md"""
 ## Ensure Type Stability at Function Borders
 """
+
+# ╔═╡ 02b67ac0-4b3b-480f-b4a8-792d74a42c0c
+begin
+	global da_x = 3.0
+	global da_y = 4.0
+end
 
 # ╔═╡ 5ed9f3b6-4182-45c9-ae9e-435ade6ef682
 function dumb_add(num1, num2)
@@ -23,21 +31,29 @@ end
 
 # ╔═╡ 7cdbc12d-23d7-4c9a-8559-9019486bf901
 function do_dumb_add()
-	x = 3.0
-	y = 4.0
-	a = x > y ? 1 : x
-	b = x > y ? 0 : y
+	a = da_x > da_y ? 1 : da_x
+	b = da_x > da_y ? 0 : da_y
 	dumb_add(a, b)
 end
 
+# ╔═╡ 0871b134-0e2e-416d-ade3-ceb143408e89
+with_terminal() do
+	@time do_dumb_add()
+end
 
 # ╔═╡ e4c0ceb3-dcb0-4cf2-a203-9654808af92e
-function do_slightly_less_dumb_add()
-	x = 3.0
-	y = 4.0
+# Make them Global variables (can't tell if values have changed)
+function do_slightly_less_dumb_add(x,y)
 	a::Int64  = x > y ? 1 : x
 	b::Int64  = x > y ? 0 : y
 	dumb_add(a, b)
+end
+
+# ╔═╡ 97b3a76e-f492-4673-a399-d3c14d9cdecf
+with_terminal() do
+	x = 3.0
+	y= 4.0
+	@time do_slightly_less_dumb_add(x,y)
 end
 
 # ╔═╡ 146b8d51-cc90-412c-84a7-dae2d0d1d09b
@@ -158,9 +174,33 @@ micah_typed = employee_typed("1994-06-04", "123 Avenue Way", 0)
 try_many_micahs = [
 	(micah_typed, typeof(micah_typed.years_in_position)),
 	update_years_in_position(micah_typed, 1.0),
-	#update_years_in_position(micah_typed, "five"),
-	#update_years_in_position(micah_typed, 1+2im)
+	# update_years_in_position(micah_typed, "five"),
+	# update_years_in_position(micah_typed, 1+2im)
 ]
+
+# ╔═╡ 60466a38-0e19-4154-a2a5-7345f19248e3
+md"""
+### Even Better Config
+"""
+
+# ╔═╡ bd5ec636-9596-46a9-a07b-96f7d0d912c0
+struct Config
+	param1::String
+	param2::Int64
+	param3::Float64
+	param4::Date
+end
+
+# ╔═╡ 4706d154-be89-4470-b170-b459ab94d945
+super_type_stable_config = Config(
+	config["param1"], 
+	config["param2"], 
+	config["param3"], 
+	config["param4"]
+)
+
+# ╔═╡ 0928eaf6-88df-4b7b-9a8c-2217dca2afbd
+super_type_stable_config.param1
 
 # ╔═╡ 4a6876a3-857c-4d7c-8ffa-2d35bac59cd9
 md"""
@@ -202,8 +242,8 @@ mapcols(x -> days_since_new_year.(x), date_df)
 
 # ╔═╡ e90faa5d-af8b-4a4c-a5af-84eaf000839d
 md"""
-## Preparing Data for Efficient Dispatch
-Dispatch is powerful, but you can give it a further boost by taking away decisions from it.
+## Dispatch and Code Readability
+We've seen that type stability is important because it allows the compiler to discard unused methods and precompile the method you're going to use, but multiple dispatch can still help with readability when you have data of many types.
 	"""
 
 # ╔═╡ 56a3a697-4114-4b90-a94b-e66805a66fdd
@@ -218,24 +258,6 @@ heterogenous_vector::Vector{Any} = [
 	12345
 ]
 
-# ╔═╡ c202e08a-a347-4821-94d4-32636ad3bd06
-begin
-	# Create your variable outside the loop
-	type_dict::Dict{DataType, Vector{Any}} = Dict()
-	
-	for x in heterogenous_vector
-		# Make a vector for each type of data in the original
-		if typeof(x) in keys(type_dict)
-			push!(type_dict[typeof(x)], x)
-		else
-			type_dict[typeof(x)] = [x]
-		end
-	end
-end
-
-# ╔═╡ 2486d867-388d-4b50-ae34-c4a3f4f6e726
-type_dict
-
 # ╔═╡ ee5d4f11-72c7-4cd1-bb53-9945e26ab5fb
 begin
 	function make_a_string(v::String)
@@ -249,25 +271,22 @@ begin
 	end
 end
 
-# ╔═╡ aec8a241-2901-4762-bb88-a7408e2e11d8
-begin
-	strings_vec::Vector{String} = []
-	for (dtype, vec) in pairs(type_dict)
-		typed_vec::Vector{dtype} = vec
-		append!(strings_vec, make_a_string.(vec))
-	end
-	strings_vec
-end
+# ╔═╡ 216e3a0c-29b1-4aaf-a758-42a7c93f3870
+string_vector::Vector{String} = make_a_string.(heterogenous_vector)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [compat]
-DataFrames = "~1.3.1"
+BenchmarkTools = "~1.2.2"
+DataFrames = "~1.3.2"
+PlutoUI = "~0.7.32"
 YAML = "~0.4.7"
 """
 
@@ -278,6 +297,12 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 julia_version = "1.7.0"
 manifest_format = "2.0"
 
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "8eaf9f1b4921132a4cff3f36a1d9ba923b14a481"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.1.4"
+
 [[deps.ArgTools]]
 uuid = "0dad84c5-d112-42e6-8d28-ef12dabb789f"
 
@@ -286,6 +311,18 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
+
+[[deps.BenchmarkTools]]
+deps = ["JSON", "Logging", "Printf", "Profile", "Statistics", "UUIDs"]
+git-tree-sha1 = "940001114a0147b6e4d10624276d56d531dd9b49"
+uuid = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+version = "1.2.2"
+
+[[deps.ColorTypes]]
+deps = ["FixedPointNumbers", "Random"]
+git-tree-sha1 = "024fe24d83e4a5bf5fc80501a314ce0d1aa35597"
+uuid = "3da002f7-5984-5a60-b8a6-cbb66c0b333f"
+version = "0.11.0"
 
 [[deps.Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "SHA", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
@@ -298,9 +335,9 @@ deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 
 [[deps.Crayons]]
-git-tree-sha1 = "b618084b49e78985ffa8422f32b9838e397b9fc2"
+git-tree-sha1 = "249fe38abf76d48563e2f4556bebd215aa317e15"
 uuid = "a8cc5b0e-0ffa-5ad4-8c14-923d3ee1735f"
-version = "4.1.0"
+version = "4.1.1"
 
 [[deps.DataAPI]]
 git-tree-sha1 = "cc70b17275652eb47bc9e5f81635981f13cea5c8"
@@ -309,9 +346,9 @@ version = "1.9.0"
 
 [[deps.DataFrames]]
 deps = ["Compat", "DataAPI", "Future", "InvertedIndices", "IteratorInterfaceExtensions", "LinearAlgebra", "Markdown", "Missings", "PooledArrays", "PrettyTables", "Printf", "REPL", "Reexport", "SortingAlgorithms", "Statistics", "TableTraits", "Tables", "Unicode"]
-git-tree-sha1 = "cfdfef912b7f93e4b848e80b9befdf9e331bc05a"
+git-tree-sha1 = "ae02104e835f219b8930c7664b8012c93475c340"
 uuid = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
-version = "1.3.1"
+version = "1.3.2"
 
 [[deps.DataStructures]]
 deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
@@ -340,6 +377,12 @@ uuid = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 deps = ["ArgTools", "LibCURL", "NetworkOptions"]
 uuid = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 
+[[deps.FixedPointNumbers]]
+deps = ["Statistics"]
+git-tree-sha1 = "335bfdceacc84c5cdf16aadc768aa5ddfc5383cc"
+uuid = "53c48c17-4a7d-5ca2-90c5-79b7896eea93"
+version = "0.8.4"
+
 [[deps.Formatting]]
 deps = ["Printf"]
 git-tree-sha1 = "8339d61043228fdd3eb658d86c926cb282ae72a8"
@@ -349,6 +392,23 @@ version = "0.4.2"
 [[deps.Future]]
 deps = ["Random"]
 uuid = "9fa8497b-333b-5362-9e8d-4d0656e87820"
+
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
+[[deps.HypertextLiteral]]
+git-tree-sha1 = "2b078b5a615c6c0396c77810d92ee8c6f470d238"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.3"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "f7be53659ab06ddc986428d3a9dcc95f6fa6705a"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.2"
 
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
@@ -366,9 +426,15 @@ version = "1.0.0"
 
 [[deps.JLLWrappers]]
 deps = ["Preferences"]
-git-tree-sha1 = "642a199af8b68253517b80bd3bfd17eb4e84df6e"
+git-tree-sha1 = "abc9885a7ca2052a736a600f7fa66209f96506e1"
 uuid = "692b3bcd-3c85-4b1f-b108-f13ce0eb3210"
-version = "1.3.0"
+version = "1.4.1"
+
+[[deps.JSON]]
+deps = ["Dates", "Mmap", "Parsers", "Unicode"]
+git-tree-sha1 = "8076680b162ada2a031f707ac7b4953e30667a37"
+uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
+version = "0.21.2"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -434,9 +500,21 @@ git-tree-sha1 = "85f8e6578bf1f9ee0d11e7bb1b1456435479d47c"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.4.1"
 
+[[deps.Parsers]]
+deps = ["Dates"]
+git-tree-sha1 = "0b5cfbb704034b5b4c1869e36634438a047df065"
+uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
+version = "2.2.1"
+
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "Markdown", "Random", "Reexport", "UUIDs"]
+git-tree-sha1 = "ae6145ca68947569058866e443df69587acc1806"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.32"
 
 [[deps.PooledArrays]]
 deps = ["DataAPI", "Future"]
@@ -459,6 +537,10 @@ version = "1.3.1"
 [[deps.Printf]]
 deps = ["Unicode"]
 uuid = "de0858da-6303-5e67-8744-51eddeeeb8d7"
+
+[[deps.Profile]]
+deps = ["Printf"]
+uuid = "9abbd945-dff8-562f-b5e8-e1ebf5ef1b79"
 
 [[deps.REPL]]
 deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
@@ -563,9 +645,12 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╔═╡ Cell order:
 # ╠═ab32e710-735f-11ec-2417-bf20f0dda11f
 # ╟─be7771fb-19c2-43b7-8eff-f2f7af7fab36
+# ╠═02b67ac0-4b3b-480f-b4a8-792d74a42c0c
 # ╠═5ed9f3b6-4182-45c9-ae9e-435ade6ef682
 # ╠═7cdbc12d-23d7-4c9a-8559-9019486bf901
+# ╠═0871b134-0e2e-416d-ade3-ceb143408e89
 # ╠═e4c0ceb3-dcb0-4cf2-a203-9654808af92e
+# ╠═97b3a76e-f492-4673-a399-d3c14d9cdecf
 # ╟─146b8d51-cc90-412c-84a7-dae2d0d1d09b
 # ╠═ff92d7a8-53cc-46b2-9e06-205d2cbaccec
 # ╠═e3ad99e1-7350-474d-8561-50fb1a3daecc
@@ -587,6 +672,10 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═609cf04b-7874-466d-806f-12ebd80e1d7c
 # ╠═b3a5183f-4c8f-48df-b094-cc688a070af2
 # ╠═cdfca0b3-8b3c-4cb1-b2c5-cece147edbda
+# ╟─60466a38-0e19-4154-a2a5-7345f19248e3
+# ╠═bd5ec636-9596-46a9-a07b-96f7d0d912c0
+# ╠═4706d154-be89-4470-b170-b459ab94d945
+# ╠═0928eaf6-88df-4b7b-9a8c-2217dca2afbd
 # ╟─4a6876a3-857c-4d7c-8ffa-2d35bac59cd9
 # ╠═65cf4392-847d-4384-b36f-6925f281223d
 # ╠═304a0263-1a04-4d67-9e0f-33a753aa1b55
@@ -595,9 +684,7 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═0f14108e-64f0-4b21-b4f9-9929978af453
 # ╟─e90faa5d-af8b-4a4c-a5af-84eaf000839d
 # ╠═56a3a697-4114-4b90-a94b-e66805a66fdd
-# ╠═c202e08a-a347-4821-94d4-32636ad3bd06
-# ╠═2486d867-388d-4b50-ae34-c4a3f4f6e726
 # ╠═ee5d4f11-72c7-4cd1-bb53-9945e26ab5fb
-# ╠═aec8a241-2901-4762-bb88-a7408e2e11d8
+# ╠═216e3a0c-29b1-4aaf-a758-42a7c93f3870
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
